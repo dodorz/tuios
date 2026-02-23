@@ -234,6 +234,14 @@ func SlowTickCmd() tea.Cmd {
 	})
 }
 
+// IdleTickCmd creates a command that generates tick messages at 10 FPS.
+// Used when the terminal has been idle for a sustained period to reduce CPU.
+func IdleTickCmd() tea.Cmd {
+	return tea.Tick(time.Second/config.IdleFPS, func(t time.Time) tea.Msg {
+		return TickerMsg(t)
+	})
+}
+
 // EnableCallbacksMsg is sent after a delay to re-enable VT emulator callbacks
 // after restoring a daemon session.
 type EnableCallbacksMsg struct{}
@@ -260,6 +268,11 @@ func TriggerAltScreenRedrawCmd() tea.Cmd {
 // Update handles all incoming messages and updates the application state.
 // It processes keyboard, mouse, and timer events, managing windows and UI updates.
 func (m *OS) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Any non-tick message invalidates the render cache
+	if _, isTick := msg.(TickerMsg); !isTick {
+		m.renderSkipped = false
+	}
+
 	switch msg := msg.(type) {
 	case TickerMsg:
 		// Proactively check for exited processes and clean them up
@@ -273,9 +286,11 @@ func (m *OS) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Update animations
 		m.UpdateAnimations()
 
-		// Update system info
-		m.UpdateCPUHistory()
-		m.UpdateRAMUsage()
+		// Update system info (only needed when dockbar is visible)
+		if config.DockbarPosition != "hidden" {
+			m.UpdateCPUHistory()
+			m.UpdateRAMUsage()
+		}
 
 		// Handle script playback if in script mode
 		cmds := []tea.Cmd{TickCmd()}
@@ -327,19 +342,29 @@ func (m *OS) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Check if we have active animations
 		hasAnimations := m.HasActiveAnimations()
 
-		// Determine tick rate based on interaction mode
+		// Determine tick rate based on activity level
 		nextTick := TickCmd()
 		if m.InteractionMode {
 			nextTick = SlowTickCmd() // 30 FPS during interactions
+			m.idleFrames = 0
+		} else if hasChanges || hasAnimations {
+			m.idleFrames = 0
+		} else {
+			m.idleFrames++
+			if m.idleFrames >= config.IdleThresholdFrames {
+				nextTick = IdleTickCmd() // 10 FPS when idle
+			}
 		}
 
 		// Skip rendering if no changes, no animations, and not in interaction mode (frame skipping)
 		if !hasChanges && !hasAnimations && !m.InteractionMode && len(m.Windows) > 0 {
+			m.renderSkipped = true
 			if len(cmds) > 1 {
 				return m, tea.Sequence(cmds...)
 			}
 			return m, nextTick
 		}
+		m.renderSkipped = false
 
 		if gfxCmd := m.GetKittyGraphicsCmd(); gfxCmd != nil {
 			cmds = append(cmds, gfxCmd)
@@ -409,6 +434,8 @@ func (m *OS) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg, tea.MouseClickMsg, tea.MouseMotionMsg,
 		tea.MouseReleaseMsg, tea.MouseWheelMsg, tea.ClipboardMsg,
 		tea.PasteMsg, tea.PasteStartMsg, tea.PasteEndMsg:
+		// Reset idle counter on any user input to restore full tick rate
+		m.idleFrames = 0
 		// Delegate to the registered input handler
 		if inputHandler != nil {
 			return inputHandler(msg, m)

@@ -147,6 +147,10 @@ type Window struct {
 	outputDone        chan struct{}        // Signal to stop output writer goroutine
 	suppressCallbacks atomic.Bool          // Suppress VT emulator callbacks during state restoration (prevents race conditions)
 
+	// HasNewOutput is set when new data is written to the terminal.
+	// Used by MarkTerminalsWithNewContent to avoid unconditional dirty-marking.
+	HasNewOutput atomic.Bool
+
 	KittyPassthroughFunc func(cmd *vt.KittyCommand, rawData []byte)
 	SixelPassthroughFunc func(cmd *vt.SixelCommand, cursorX, cursorY, absLine int)
 
@@ -506,6 +510,7 @@ func (w *Window) outputWriter() {
 				return
 			}
 			if w.Terminal != nil {
+				w.HasNewOutput.Store(true)
 				w.ioMu.Lock()
 				_, _ = w.Terminal.Write(data)
 				w.ioMu.Unlock()
@@ -545,6 +550,7 @@ func (w *Window) StartDaemonResponseReader() {
 // Used in daemon mode to process PTY output received from the daemon.
 func (w *Window) WriteOutput(data []byte) {
 	if w.Terminal != nil {
+		w.HasNewOutput.Store(true)
 		w.ioMu.Lock()
 		_, _ = w.Terminal.Write(data)
 		w.ioMu.Unlock()
@@ -802,6 +808,8 @@ func (w *Window) handleIOOperations() {
 					return
 				}
 				if n > 0 {
+					w.HasNewOutput.Store(true)
+
 					// Debug: Log all data from PTY (applications sending queries)
 					if os.Getenv("TUIOS_DEBUG_INTERNAL") == "1" {
 						if len(buf[:n]) >= 2 && buf[0] == '\x1b' {
@@ -870,15 +878,13 @@ func (w *Window) handleIOOperations() {
 				if n > 0 {
 					data := buf[:n]
 
-					// Debug: Log all escape sequences from terminal when debug mode is enabled
+					// Debug: Log ALL data from terminal response pipe when debug mode is enabled
 					if os.Getenv("TUIOS_DEBUG_INTERNAL") == "1" {
-						if len(data) >= 2 && data[0] == '\x1b' {
-							debugMsg := fmt.Sprintf("[%s] Terminal->PTY escape seq: %q (hex: % x)\n",
-								time.Now().Format("15:04:05.000"), string(data), data)
-							if f, err := os.OpenFile("/tmp/tuios-debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-								_, _ = f.WriteString(debugMsg)
-								_ = f.Close()
-							}
+						debugMsg := fmt.Sprintf("[%s] Terminal->PTY [%s] ALL data (%d bytes): %q (hex: % x)\n",
+							time.Now().Format("15:04:05.000"), w.ID[:8], len(data), string(data), data)
+						if f, err := os.OpenFile("/tmp/tuios-debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+							_, _ = f.WriteString(debugMsg)
+							_ = f.Close()
 						}
 					}
 
@@ -1119,6 +1125,16 @@ func (w *Window) SendInput(input []byte) error {
 			return fmt.Errorf("daemon write function not set")
 		}
 		return w.DaemonWriteFunc(input)
+	}
+
+	// Debug: Log all SendInput calls when debug mode is enabled
+	if os.Getenv("TUIOS_DEBUG_INTERNAL") == "1" {
+		debugMsg := fmt.Sprintf("[%s] SendInput [%s] (%d bytes): %q (hex: % x)\n",
+			time.Now().Format("15:04:05.000"), w.ID[:8], len(input), string(input), input)
+		if f, err := os.OpenFile("/tmp/tuios-debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+			_, _ = f.WriteString(debugMsg)
+			_ = f.Close()
+		}
 	}
 
 	// Local mode - write directly to PTY

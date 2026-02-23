@@ -4,6 +4,7 @@ package theme
 import (
 	"fmt"
 	"image/color"
+	"log"
 
 	"charm.land/lipgloss/v2"
 	tint "github.com/lrstanley/bubbletint/v2"
@@ -23,6 +24,13 @@ func Initialize(themeName string) error {
 
 	enabled = true
 	tint.NewDefaultRegistry()
+
+	// Load custom themes from user's themes directory
+	if themesDir, err := GetThemesDir(); err == nil {
+		if _, err := LoadCustomThemes(themesDir); err != nil {
+			log.Printf("Warning: error loading custom themes: %v", err)
+		}
+	}
 
 	// Try to set the theme by ID
 	ok := tint.SetTintID(themeName)

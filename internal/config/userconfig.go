@@ -38,6 +38,7 @@ type AppearanceConfig struct {
 	WhichKeyPosition    string `toml:"whichkey_position"`     // Which-key popup position: bottom-right, bottom-left, top-right, top-left, center (default: bottom-right)
 	WindowTitlePosition string `toml:"window_title_position"` // Window title position: bottom, top, hidden (default: bottom). Shows CustomName if set, else terminal title.
 	HideClock           bool   `toml:"hide_clock"`            // Hide the clock overlay (default: false)
+	Theme               string `toml:"theme"`                 // Color theme name (e.g., dracula, nord, my-custom-theme)
 }
 
 // KeybindingsConfig holds all keybinding configurations
@@ -449,6 +450,11 @@ func createDefaultConfig() (*UserConfig, error) {
 	sb.WriteString("# scrollback_lines: Number of lines to keep in scrollback buffer\n")
 	sb.WriteString("#   Range: 100 to 1000000\n")
 	sb.WriteString("#   Default: 10000\n")
+	sb.WriteString("#\n")
+	sb.WriteString("# theme: Color theme name (e.g., dracula, nord, my-custom-theme)\n")
+	sb.WriteString("#   Leave empty to use standard terminal colors.\n")
+	sb.WriteString("#   CLI flag --theme overrides this. Custom themes: ~/.config/tuios/themes/*.json\n")
+	sb.WriteString("#   Default: (empty - no theme)\n")
 	sb.WriteString("# ============================================================================\n\n")
 
 	if _, err := sb.Write(data); err != nil {

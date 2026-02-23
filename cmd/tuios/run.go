@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"runtime/pprof"
 	"syscall"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/Gaurav-Gosain/tuios/internal/app"
@@ -18,10 +19,62 @@ import (
 	"github.com/Gaurav-Gosain/tuios/internal/terminal"
 )
 
+// debugLogEvent logs events to /tmp/tuios-events.log when TUIOS_DEBUG_INTERNAL=1.
+// Only logs KeyPressMsg, MouseMotionMsg, and unknown events in TerminalMode
+// to diagnose phantom keypresses (issue #78).
+func debugLogEvent(osModel *app.OS, msg tea.Msg) {
+	if os.Getenv("TUIOS_DEBUG_INTERNAL") != "1" {
+		return
+	}
+
+	// Determine focused window mouse mode context
+	mouseMode := "none"
+	if fw := osModel.GetFocusedWindow(); fw != nil && fw.Terminal != nil {
+		if fw.Terminal.HasMouseMode() {
+			mouseMode = "has_mouse"
+		} else {
+			mouseMode = "no_mouse"
+		}
+	}
+
+	modeStr := "WinMgmt"
+	if osModel.Mode == app.TerminalMode {
+		modeStr = "Terminal"
+	}
+
+	var logLine string
+	switch m := msg.(type) {
+	case tea.KeyPressMsg:
+		logLine = fmt.Sprintf("[%s] KEY mode=%s mouse=%s: key=%q code=%d mod=%d text=%q\n",
+			time.Now().Format("15:04:05.000"), modeStr, mouseMode,
+			m.String(), m.Code, m.Mod, m.Text)
+	case tea.MouseMotionMsg:
+		// Only log in TerminalMode to avoid flooding
+		if osModel.Mode != app.TerminalMode {
+			return
+		}
+		logLine = fmt.Sprintf("[%s] MOUSE_MOTION mode=%s mouse=%s: x=%d y=%d\n",
+			time.Now().Format("15:04:05.000"), modeStr, mouseMode, m.X, m.Y)
+	default:
+		return
+	}
+
+	f, err := os.OpenFile("/tmp/tuios-events.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	_, _ = f.WriteString(logLine)
+	_ = f.Close()
+}
+
 // filterMouseMotion filters out redundant mouse motion events to reduce CPU usage.
 // Only passes through mouse motion during drag/resize operations.
 func filterMouseMotion(model tea.Model, msg tea.Msg) tea.Msg {
 	if _, ok := msg.(tea.MouseMotionMsg); !ok {
+		// Debug: log non-motion events (KeyPressMsg) before they reach Update
+		if osModel, ok := model.(*app.OS); ok {
+			debugLogEvent(osModel, msg)
+		}
 		return msg
 	}
 
@@ -29,6 +82,9 @@ func filterMouseMotion(model tea.Model, msg tea.Msg) tea.Msg {
 	if !ok {
 		return msg
 	}
+
+	// Debug: log motion events
+	debugLogEvent(os, msg)
 
 	if os.Dragging || os.Resizing {
 		return msg
@@ -43,7 +99,7 @@ func filterMouseMotion(model tea.Model, msg tea.Msg) tea.Msg {
 
 	if os.Mode == app.TerminalMode {
 		focusedWindow := os.GetFocusedWindow()
-		if focusedWindow != nil && focusedWindow.IsAltScreen {
+		if focusedWindow != nil && focusedWindow.Terminal != nil && focusedWindow.Terminal.HasMouseMode() {
 			return msg
 		}
 	}

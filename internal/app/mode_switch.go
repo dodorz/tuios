@@ -1,6 +1,8 @@
 package app
 
 import (
+	"time"
+
 	tea "charm.land/bubbletea/v2"
 	"github.com/Gaurav-Gosain/tuios/internal/tape"
 )
@@ -14,6 +16,7 @@ func (m *OS) EnterTerminalMode() tea.Cmd {
 	}
 
 	m.Mode = TerminalMode
+	m.TerminalModeEnteredAt = time.Now()
 
 	// Raw reader disabled - Bubbletea handles all input correctly including:
 	// - Bracketed paste for Cmd+V (via PasteMsg)

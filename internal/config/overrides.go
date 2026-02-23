@@ -104,10 +104,14 @@ func ApplyOverrides(overrides Overrides, userConfig *UserConfig) {
 		AnimationsEnabled = false
 	}
 
-	// Theme - initialize if specified
-	if overrides.ThemeName != "" {
-		if err := theme.Initialize(overrides.ThemeName); err != nil {
-			log.Printf("Warning: Failed to load theme '%s': %v", overrides.ThemeName, err)
+	// Theme - CLI flag takes precedence, otherwise use user config
+	themeName := overrides.ThemeName
+	if themeName == "" && userConfig != nil && userConfig.Appearance.Theme != "" {
+		themeName = userConfig.Appearance.Theme
+	}
+	if themeName != "" {
+		if err := theme.Initialize(themeName); err != nil {
+			log.Printf("Warning: Failed to load theme '%s': %v", themeName, err)
 		}
 	}
 }

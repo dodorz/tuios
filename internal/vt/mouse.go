@@ -83,6 +83,24 @@ func (e *Emulator) SendMouse(m Mouse) {
 		return
 	}
 
+	// Gate motion events on modes that actually support them.
+	// Mode 1000/1001 (Normal/Highlight) only supports click/release.
+	// Mode 1002 (ButtonEvent) supports motion while a button is pressed.
+	// Mode 1003 (AnyEvent) supports all motion.
+	if _, isMotion := m.(MouseMotion); isMotion {
+		switch mode {
+		case ansi.ModeMouseX10, ansi.ModeMouseNormal, ansi.ModeMouseHighlight:
+			// These modes don't support motion events at all
+			return
+		case ansi.ModeMouseButtonEvent:
+			// CellMotion: only forward motion if a button is pressed
+			if m.Mouse().Button == MouseNone {
+				return
+			}
+		}
+		// ModeMouseAnyEvent: forward all motion
+	}
+
 	for _, mm := range []ansi.DECMode{
 		// ansi.Utf8ExtMouseMode,
 		ansi.ModeMouseExtSgr,

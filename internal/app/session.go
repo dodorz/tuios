@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"maps"
 	"os"
+	"time"
 
 	"github.com/Gaurav-Gosain/tuios/internal/layout"
 	"github.com/Gaurav-Gosain/tuios/internal/session"
@@ -312,6 +313,7 @@ func (m *OS) RestoreFromState(state *session.SessionState) error {
 	// This ensures mouse events are forwarded to terminals after restore
 	if len(m.Windows) > 0 && m.FocusedWindow >= 0 {
 		m.Mode = TerminalMode
+		m.TerminalModeEnteredAt = time.Now()
 	}
 
 	return nil

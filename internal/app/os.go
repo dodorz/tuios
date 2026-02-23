@@ -106,6 +106,7 @@ type OS struct {
 	LastMouseX         int
 	LastMouseY         int
 	HasActiveTerminals bool
+	idleFrames         int // Consecutive frames with no content changes (for adaptive tick)
 	ShowHelp           bool
 	InteractionMode    bool                       // True when actively dragging/resizing
 	MouseSnapping      bool                       // Enable/disable mouse snapping
@@ -159,6 +160,8 @@ type OS struct {
 	cachedSeparator      string // Cached dock separator string
 	cachedSeparatorWidth int    // Width of cached separator
 	workspaceActiveStyle *lipgloss.Style
+	cachedViewContent string // Cached full View() output to skip rendering on idle ticks
+	renderSkipped     bool   // True when frame-skip fired; View() returns cached content
 	// SSH mode fields
 	SSHSession ssh.Session // SSH session reference (nil in local mode)
 	IsSSHMode  bool        // True when running over SSH
@@ -204,6 +207,10 @@ type OS struct {
 	KittyPassthrough *KittyPassthrough
 	// Sixel Graphics passthrough for forwarding to host terminal
 	SixelPassthrough *SixelPassthrough
+	// TerminalModeEnteredAt tracks when we last switched to TerminalMode.
+	// Used to suppress misparsed mouse-sequence fragments (phantom keypresses)
+	// during the AllMotion→CellMotion transition window.
+	TerminalModeEnteredAt time.Time
 }
 
 // Notification represents a temporary notification message.
@@ -1108,6 +1115,7 @@ func (m *OS) MarkAllDirty() {
 		m.Windows[i].Dirty = true
 		m.Windows[i].ContentDirty = true
 	}
+	m.cachedViewContent = "" // Invalidate view cache
 }
 
 // MarkTerminalsWithNewContent marks terminals that have new content as dirty.
@@ -1151,11 +1159,15 @@ func (m *OS) MarkTerminalsWithNewContent() bool {
 			continue
 		}
 
-		// Smart content updating with throttling
-		isFocused := i == focusedWindowIndex
+		// Only mark dirty when the terminal actually received new output.
+		// This avoids the old unconditional dirty-marking that defeated frame skipping.
+		newOutput := window.HasNewOutput.Swap(false)
+		if !newOutput {
+			continue
+		}
 
+		isFocused := i == focusedWindowIndex
 		if isFocused {
-			// Always update focused window immediately for responsive interaction
 			window.MarkContentDirty()
 			hasChanges = true
 		} else {

@@ -12,6 +12,17 @@ import (
 
 // HandleTerminalModeKey handles keyboard input in terminal mode
 func HandleTerminalModeKey(msg tea.KeyPressMsg, o *app.OS) (*app.OS, tea.Cmd) {
+	// Guard: suppress misparsed mouse-sequence fragments during AllMotion→CellMotion transition.
+	// When switching from WindowManagementMode (AllMotion) to TerminalMode (CellMotion),
+	// buffered mouse motion sequences can be split across read boundaries. ultraviolet's
+	// 50ms ESC timeout force-processes partial CSI sequences, and the remaining bytes
+	// (digits, 'M', ';', etc.) are decoded as individual KeyPressEvents.
+	// Suppress unmodified single-character keys for 150ms after entering TerminalMode.
+	if msg.Mod == 0 && msg.Text != "" && !o.TerminalModeEnteredAt.IsZero() &&
+		time.Since(o.TerminalModeEnteredAt) < 150*time.Millisecond {
+		return o, nil
+	}
+
 	focusedWindow := o.GetFocusedWindow()
 
 	// Handle help menu first (takes priority over everything in terminal mode)

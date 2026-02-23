@@ -76,6 +76,14 @@ const (
 	// Lower FPS during interactions improves mouse responsiveness
 	InteractionFPS = 30
 
+	// IdleFPS is the refresh rate when the terminal is idle (no output for ~500ms).
+	// Reduces CPU usage from ~10% to near-zero on idle.
+	IdleFPS = 10
+
+	// IdleThresholdFrames is the number of consecutive idle frames at NormalFPS
+	// before switching to IdleFPS (~500ms at 60 FPS).
+	IdleThresholdFrames = 30
+
 	// BackgroundWindowUpdateCycle is the number of update cycles to skip for background windows
 	BackgroundWindowUpdateCycle = 3
 )

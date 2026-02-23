@@ -25,7 +25,6 @@ func (m *OS) GetCanvas(render bool) *lipgloss.Canvas {
 	box := lipgloss.NewStyle().
 		Align(lipgloss.Left).
 		AlignVertical(lipgloss.Top).
-		Foreground(lipgloss.Color("#FFFFFF")).
 		Border(getBorder()).
 		BorderTop(false)
 
@@ -147,12 +146,38 @@ func (m *OS) GetCanvas(render bool) *lipgloss.Canvas {
 func (m *OS) View() tea.View {
 	var view tea.View
 
-	content := lipgloss.Sprint(m.GetCanvas(true).Render())
-
-	view.SetContent(content)
+	// Fast path: return cached content when frame-skip determined nothing changed.
+	// This avoids the expensive GetCanvas → ultraviolet render pipeline on idle ticks.
+	if m.renderSkipped && m.cachedViewContent != "" {
+		view.SetContent(m.cachedViewContent)
+	} else {
+		content := lipgloss.Sprint(m.GetCanvas(true).Render())
+		m.cachedViewContent = content
+		view.SetContent(content)
+	}
 
 	view.AltScreen = true
-	view.MouseMode = tea.MouseModeAllMotion
+
+	// Dynamically select mouse tracking mode based on the child app's actual needs:
+	// - Window management mode: AllMotion for hover effects (dock, UI)
+	// - Terminal mode + child requested mode 1003 (any-event): AllMotion
+	// - Terminal mode + child requested mode 1002 (button-event): CellMotion
+	// - Terminal mode + child requested mode 1000/1001 (click only): CellMotion
+	// - Terminal mode + no mouse mode (kakoune default, nano): CellMotion
+	//
+	// Using AllMotion for apps that only need click tracking (mode 1000) causes
+	// a flood of motion events that get forwarded as phantom keypresses (#78).
+	if m.Mode == TerminalMode {
+		fw := m.GetFocusedWindow()
+		if fw != nil && fw.Terminal != nil && fw.Terminal.HasAllMotionMode() {
+			view.MouseMode = tea.MouseModeAllMotion
+		} else {
+			view.MouseMode = tea.MouseModeCellMotion
+		}
+	} else {
+		view.MouseMode = tea.MouseModeAllMotion
+	}
+
 	view.ReportFocus = true
 	view.DisableBracketedPasteMode = false
 	view.Cursor = m.getRealCursor()

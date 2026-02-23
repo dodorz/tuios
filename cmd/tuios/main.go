@@ -10,6 +10,7 @@ import (
 	"os"
 
 	"github.com/Gaurav-Gosain/tuios/internal/session"
+	"github.com/Gaurav-Gosain/tuios/internal/theme"
 	"github.com/charmbracelet/fang"
 	tint "github.com/lrstanley/bubbletint/v2"
 	"github.com/spf13/cobra"
@@ -89,10 +90,12 @@ comprehensive keyboard/mouse interactions.`,
 			}
 
 			if listThemes {
-				tint.NewDefaultRegistry()
+				if err := theme.Initialize("default"); err != nil {
+					return fmt.Errorf("failed to initialize themes: %w", err)
+				}
 				themes := tint.TintIDs()
-				for _, theme := range themes {
-					fmt.Println(theme)
+				for _, t := range themes {
+					fmt.Println(t)
 				}
 				return nil
 			}

@@ -109,8 +109,8 @@ func handleMouseClick(msg tea.MouseClickMsg, o *app.OS) (*app.OS, tea.Cmd) {
 		clickedWindow := o.Windows[clickedWindowIndex]
 		hasMouseMode := clickedWindow.Terminal != nil && clickedWindow.Terminal.HasMouseMode()
 
-		// Forward mouse if alt screen or has mouse mode enabled (e.g., restored daemon session)
-		shouldForward := clickedWindow.IsAltScreen || hasMouseMode
+		// Forward mouse only when app explicitly requested mouse tracking (DECSET 1000-1003)
+		shouldForward := hasMouseMode
 		if shouldForward && clickedWindow.Terminal != nil {
 			// Convert to terminal-relative coordinates (0-based)
 			termX := X - clickedWindow.X - 1 // Account for left border
@@ -342,12 +342,14 @@ func handleMouseMotion(msg tea.MouseMotionMsg, o *app.OS) (*app.OS, tea.Cmd) {
 	o.LastMouseX = mouse.X
 	o.LastMouseY = mouse.Y
 
-	// Forward mouse motion to terminal if in terminal mode and window has mouse tracking
+	// Forward mouse motion to terminal if in terminal mode and window supports motion events.
+	// Only modes 1002 (button-event) and 1003 (any-event) support motion forwarding.
+	// Mode 1000/1001 (normal tracking) only supports click/release — forwarding motion
+	// events to these apps causes phantom keypresses (issue #78).
 	if o.Mode == app.TerminalMode {
 		focusedWindow := o.GetFocusedWindow()
 		if focusedWindow != nil && focusedWindow.Terminal != nil {
-			hasMouseMode := focusedWindow.Terminal.HasMouseMode()
-			shouldForward := focusedWindow.IsAltScreen || hasMouseMode
+			shouldForward := focusedWindow.Terminal.SupportsMotionEvents()
 
 			if shouldForward {
 				// Convert to terminal-relative coordinates (0-based)
@@ -615,7 +617,7 @@ func handleMouseRelease(msg tea.MouseReleaseMsg, o *app.OS) (*app.OS, tea.Cmd) {
 		focusedWindow := o.GetFocusedWindow()
 		if focusedWindow != nil && focusedWindow.Terminal != nil {
 			hasMouseMode := focusedWindow.Terminal.HasMouseMode()
-			shouldForward := focusedWindow.IsAltScreen || hasMouseMode
+			shouldForward := hasMouseMode
 
 			if shouldForward {
 				mouse := msg.Mouse()
@@ -910,7 +912,7 @@ func handleMouseWheel(msg tea.MouseWheelMsg, o *app.OS) (*app.OS, tea.Cmd) {
 		focusedWindow := o.GetFocusedWindow()
 		if focusedWindow != nil && focusedWindow.Terminal != nil {
 			hasMouseMode := focusedWindow.Terminal.HasMouseMode()
-			shouldForward := focusedWindow.IsAltScreen || hasMouseMode
+			shouldForward := hasMouseMode
 
 			if shouldForward {
 				mouse := msg.Mouse()

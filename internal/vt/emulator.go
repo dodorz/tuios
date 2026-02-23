@@ -412,7 +412,6 @@ func (e *Emulator) RestoreModes(modes map[int]bool) {
 }
 
 // HasMouseMode returns true if any mouse tracking mode is enabled.
-// This is useful for debugging mouse event forwarding issues.
 func (e *Emulator) HasMouseMode() bool {
 	for _, m := range []ansi.DECMode{
 		ansi.ModeMouseX10,
@@ -426,6 +425,25 @@ func (e *Emulator) HasMouseMode() bool {
 		}
 	}
 	return false
+}
+
+// HasAllMotionMode returns true only if the child app requested mode 1003
+// (any-event tracking), which reports ALL mouse motion including no-button motion.
+// Used to decide whether the host terminal should use AllMotion vs CellMotion.
+func (e *Emulator) HasAllMotionMode() bool {
+	return e.isModeSet(ansi.ModeMouseAnyEvent)
+}
+
+// HasCellMotionMode returns true if the child app requested mode 1002
+// (button-event tracking), which reports motion while a button is pressed.
+func (e *Emulator) HasCellMotionMode() bool {
+	return e.isModeSet(ansi.ModeMouseButtonEvent)
+}
+
+// SupportsMotionEvents returns true if the child app's mouse mode supports
+// motion events (modes 1002 or 1003). Modes 1000/1001 only support click/release.
+func (e *Emulator) SupportsMotionEvents() bool {
+	return e.isModeSet(ansi.ModeMouseButtonEvent) || e.isModeSet(ansi.ModeMouseAnyEvent)
 }
 
 // EncodeMouseEvent encodes a mouse event as an escape sequence string.
