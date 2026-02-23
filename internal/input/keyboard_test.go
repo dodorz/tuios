@@ -26,40 +26,40 @@ func TestTransitionGuardCondition(t *testing.T) {
 		wantBlock   bool
 	}{
 		{
-			name:      "digit during transition - block (mouse fragment)",
-			key:       tea.KeyPressMsg{Code: '2', Text: "2"},
+			name:       "digit during transition - block (mouse fragment)",
+			key:        tea.KeyPressMsg{Code: '2', Text: "2"},
 			enteredAgo: 10 * time.Millisecond,
-			wantBlock: true,
+			wantBlock:  true,
 		},
 		{
-			name:      "letter M during transition - block (SGR terminator)",
-			key:       tea.KeyPressMsg{Code: 'M', Text: "M"},
+			name:       "letter M during transition - block (SGR terminator)",
+			key:        tea.KeyPressMsg{Code: 'M', Text: "M"},
 			enteredAgo: 50 * time.Millisecond,
-			wantBlock: true,
+			wantBlock:  true,
 		},
 		{
-			name:      "semicolon during transition - block (SGR separator)",
-			key:       tea.KeyPressMsg{Code: ';', Text: ";"},
+			name:       "semicolon during transition - block (SGR separator)",
+			key:        tea.KeyPressMsg{Code: ';', Text: ";"},
 			enteredAgo: 100 * time.Millisecond,
-			wantBlock: true,
+			wantBlock:  true,
 		},
 		{
-			name:      "digit after transition window - pass through",
-			key:       tea.KeyPressMsg{Code: '2', Text: "2"},
+			name:       "digit after transition window - pass through",
+			key:        tea.KeyPressMsg{Code: '2', Text: "2"},
 			enteredAgo: 200 * time.Millisecond,
-			wantBlock: false,
+			wantBlock:  false,
 		},
 		{
-			name:      "ctrl+b during transition - pass through (has modifier)",
-			key:       tea.KeyPressMsg{Code: 'b', Mod: tea.ModCtrl},
+			name:       "ctrl+b during transition - pass through (has modifier)",
+			key:        tea.KeyPressMsg{Code: 'b', Mod: tea.ModCtrl},
 			enteredAgo: 10 * time.Millisecond,
-			wantBlock: false,
+			wantBlock:  false,
 		},
 		{
-			name:      "escape during transition - pass through (no Text)",
-			key:       tea.KeyPressMsg{Code: tea.KeyEscape},
+			name:       "escape during transition - pass through (no Text)",
+			key:        tea.KeyPressMsg{Code: tea.KeyEscape},
 			enteredAgo: 10 * time.Millisecond,
-			wantBlock: false,
+			wantBlock:  false,
 		},
 		{
 			name:        "zero timestamp - pass through (no mode switch recorded)",
@@ -68,10 +68,10 @@ func TestTransitionGuardCondition(t *testing.T) {
 			wantBlock:   false,
 		},
 		{
-			name:      "alt+key during transition - pass through (has modifier)",
-			key:       tea.KeyPressMsg{Code: '1', Mod: tea.ModAlt, Text: "1"},
+			name:       "alt+key during transition - pass through (has modifier)",
+			key:        tea.KeyPressMsg{Code: '1', Mod: tea.ModAlt, Text: "1"},
 			enteredAgo: 10 * time.Millisecond,
-			wantBlock: false,
+			wantBlock:  false,
 		},
 	}
 
