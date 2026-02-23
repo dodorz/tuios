@@ -68,20 +68,19 @@ func LoadCustomThemeFile(path string) (*tint.Tint, error) {
 		return nil, fmt.Errorf("failed to parse theme JSON: %w", err)
 	}
 
-	// Derive ID from filename if empty
+	// Derive ID from filename if not set in JSON
 	if t.ID == "" {
 		base := filepath.Base(path)
-		t.ID = strings.TrimSuffix(base, filepath.Ext(base))
-		t.ID = strings.ToLower(t.ID)
+		t.ID = strings.ToLower(strings.TrimSuffix(base, filepath.Ext(base)))
+	}
+
+	if t.ID == "" {
+		return nil, fmt.Errorf("theme has no ID")
 	}
 
 	// Set DisplayName from ID if empty
 	if t.DisplayName == "" {
 		t.DisplayName = t.ID
-	}
-
-	if t.ID == "" {
-		return nil, fmt.Errorf("theme has no ID")
 	}
 
 	fillDefaults(&t)
@@ -162,6 +161,6 @@ func copyColor(c *tint.Color) *tint.Color {
 	if c == nil {
 		return nil
 	}
-	copy := *c
-	return &copy
+	dup := *c
+	return &dup
 }

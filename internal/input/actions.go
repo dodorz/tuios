@@ -534,15 +534,8 @@ func handleToggleLogs(_ tea.KeyPressMsg, o *app.OS) (*app.OS, tea.Cmd) {
 		// Opening the log viewer - log the message first
 		o.LogInfo("Log viewer opened")
 
-		// Then calculate actual max scroll and go to bottom
-		maxDisplayHeight := max(o.Height-8, 8)
-		totalLogs := len(o.LogMessages)
-		fixedLines := 4
-		if totalLogs > maxDisplayHeight-fixedLines {
-			fixedLines = 6
-		}
-		logsPerPage := max(maxDisplayHeight-fixedLines, 1)
-		maxScroll := max(totalLogs-logsPerPage, 0)
+		// Scroll to bottom to show most recent entries
+		_, maxScroll := logScrollBounds(o.Height, len(o.LogMessages))
 		o.LogScrollOffset = maxScroll
 	}
 	return o, nil

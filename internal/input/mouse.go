@@ -19,53 +19,10 @@ func isInTerminalContent(x, y int, win *terminal.Window) bool {
 	return x >= 0 && y >= 0 && x < win.Width-2 && y < win.Height-2
 }
 
-// sendMouseClickToWindow sends a mouse click event to a window's terminal.
-func sendMouseClickToWindow(win *terminal.Window, event uv.MouseClickEvent) {
-	if win.Terminal == nil {
-		return
-	}
-	if win.DaemonMode {
-		seq := win.Terminal.EncodeMouseEvent(event)
-		if seq != "" {
-			_ = win.SendInput([]byte(seq))
-		}
-	} else {
-		win.Terminal.SendMouse(event)
-	}
-}
-
-// sendMouseMotionToWindow sends a mouse motion event to a window's terminal.
-func sendMouseMotionToWindow(win *terminal.Window, event uv.MouseMotionEvent) {
-	if win.Terminal == nil {
-		return
-	}
-	if win.DaemonMode {
-		seq := win.Terminal.EncodeMouseEvent(event)
-		if seq != "" {
-			_ = win.SendInput([]byte(seq))
-		}
-	} else {
-		win.Terminal.SendMouse(event)
-	}
-}
-
-// sendMouseReleaseToWindow sends a mouse release event to a window's terminal.
-func sendMouseReleaseToWindow(win *terminal.Window, event uv.MouseReleaseEvent) {
-	if win.Terminal == nil {
-		return
-	}
-	if win.DaemonMode {
-		seq := win.Terminal.EncodeMouseEvent(event)
-		if seq != "" {
-			_ = win.SendInput([]byte(seq))
-		}
-	} else {
-		win.Terminal.SendMouse(event)
-	}
-}
-
-// sendMouseWheelToWindow sends a mouse wheel event to a window's terminal.
-func sendMouseWheelToWindow(win *terminal.Window, event uv.MouseWheelEvent) {
+// sendMouseToWindow forwards a mouse event to a window's terminal.
+// In daemon mode, the event is encoded as an escape sequence and written via PTY.
+// In local mode, the event is sent directly to the emulator.
+func sendMouseToWindow(win *terminal.Window, event uv.MouseEvent) {
 	if win.Terminal == nil {
 		return
 	}
@@ -107,11 +64,8 @@ func handleMouseClick(msg tea.MouseClickMsg, o *app.OS) (*app.OS, tea.Cmd) {
 	// Forward mouse events to terminal if in terminal mode and window has mouse tracking
 	if clickedWindowIndex != -1 && o.Mode == app.TerminalMode {
 		clickedWindow := o.Windows[clickedWindowIndex]
-		hasMouseMode := clickedWindow.Terminal != nil && clickedWindow.Terminal.HasMouseMode()
-
 		// Forward mouse only when app explicitly requested mouse tracking (DECSET 1000-1003)
-		shouldForward := hasMouseMode
-		if shouldForward && clickedWindow.Terminal != nil {
+		if clickedWindow.Terminal != nil && clickedWindow.Terminal.HasMouseMode() {
 			// Convert to terminal-relative coordinates (0-based)
 			termX := X - clickedWindow.X - 1 // Account for left border
 			termY := Y - clickedWindow.Y - 1 // Account for top border
@@ -128,7 +82,7 @@ func handleMouseClick(msg tea.MouseClickMsg, o *app.OS) (*app.OS, tea.Cmd) {
 					Mod:    uv.KeyMod(mouse.Mod),
 				}
 				// Send to the terminal (uses PTY for daemon windows)
-				sendMouseClickToWindow(clickedWindow, adjustedMouse)
+				sendMouseToWindow(clickedWindow, adjustedMouse)
 				return o, nil
 			}
 		}
@@ -365,7 +319,7 @@ func handleMouseMotion(msg tea.MouseMotionMsg, o *app.OS) (*app.OS, tea.Cmd) {
 						Mod:    uv.KeyMod(mouse.Mod),
 					}
 					// Send to the terminal (uses PTY for daemon windows)
-					sendMouseMotionToWindow(focusedWindow, adjustedMouse)
+					sendMouseToWindow(focusedWindow, adjustedMouse)
 					return o, nil
 				}
 			}
@@ -615,28 +569,21 @@ func handleMouseRelease(msg tea.MouseReleaseMsg, o *app.OS) (*app.OS, tea.Cmd) {
 	// Forward mouse release to terminal if in terminal mode and window has mouse tracking
 	if o.Mode == app.TerminalMode {
 		focusedWindow := o.GetFocusedWindow()
-		if focusedWindow != nil && focusedWindow.Terminal != nil {
-			hasMouseMode := focusedWindow.Terminal.HasMouseMode()
-			shouldForward := hasMouseMode
-
-			if shouldForward {
-				mouse := msg.Mouse()
-				// Convert to terminal-relative coordinates (0-based)
-				termX := mouse.X - focusedWindow.X - 1 // Account for left border
-				termY := mouse.Y - focusedWindow.Y - 1 // Account for top border
-				// Check if release is within terminal content area
-				if termX >= 0 && termY >= 0 && termX < focusedWindow.Width-2 && termY < focusedWindow.Height-2 {
-					// Create adjusted mouse event with terminal-relative coordinates
-					adjustedMouse := uv.MouseReleaseEvent{
-						X:      termX,
-						Y:      termY,
-						Button: uv.MouseButton(mouse.Button),
-						Mod:    uv.KeyMod(mouse.Mod),
-					}
-					// Send to the terminal (uses PTY for daemon windows)
-					sendMouseReleaseToWindow(focusedWindow, adjustedMouse)
-					return o, nil
+		if focusedWindow != nil && focusedWindow.Terminal != nil && focusedWindow.Terminal.HasMouseMode() {
+			mouse := msg.Mouse()
+			// Convert to terminal-relative coordinates (0-based)
+			termX := mouse.X - focusedWindow.X - 1 // Account for left border
+			termY := mouse.Y - focusedWindow.Y - 1 // Account for top border
+			// Check if release is within terminal content area
+			if termX >= 0 && termY >= 0 && termX < focusedWindow.Width-2 && termY < focusedWindow.Height-2 {
+				adjustedMouse := uv.MouseReleaseEvent{
+					X:      termX,
+					Y:      termY,
+					Button: uv.MouseButton(mouse.Button),
+					Mod:    uv.KeyMod(mouse.Mod),
 				}
+				sendMouseToWindow(focusedWindow, adjustedMouse)
+				return o, nil
 			}
 		}
 	}
@@ -879,19 +826,7 @@ func handleMouseWheel(msg tea.MouseWheelMsg, o *app.OS) (*app.OS, tea.Cmd) {
 	}
 
 	if o.ShowLogs {
-		// Calculate scroll bounds (same logic as keyboard handler)
-		maxDisplayHeight := max(o.Height-8, 8)
-		totalLogs := len(o.LogMessages)
-
-		// Fixed overhead: title (1) + blank after title (1) + blank before hint (1) + hint (1) = 4
-		fixedLines := 4
-		// If scrollable, add scroll indicator: blank (1) + indicator (1) = 2
-		if totalLogs > maxDisplayHeight-fixedLines {
-			fixedLines = 6
-		}
-		logsPerPage := max(maxDisplayHeight-fixedLines, 1)
-
-		maxScroll := max(totalLogs-logsPerPage, 0)
+		_, maxScroll := logScrollBounds(o.Height, len(o.LogMessages))
 
 		switch msg.Button {
 		case tea.MouseWheelUp:
@@ -910,28 +845,21 @@ func handleMouseWheel(msg tea.MouseWheelMsg, o *app.OS) (*app.OS, tea.Cmd) {
 	// This allows applications like vim, less, htop to handle their own scrolling
 	if o.Mode == app.TerminalMode {
 		focusedWindow := o.GetFocusedWindow()
-		if focusedWindow != nil && focusedWindow.Terminal != nil {
-			hasMouseMode := focusedWindow.Terminal.HasMouseMode()
-			shouldForward := hasMouseMode
-
-			if shouldForward {
-				mouse := msg.Mouse()
-				// Convert to terminal-relative coordinates (0-based)
-				termX := mouse.X - focusedWindow.X - 1 // Account for left border
-				termY := mouse.Y - focusedWindow.Y - 1 // Account for top border
-				// Check if wheel is within terminal content area
-				if termX >= 0 && termY >= 0 && termX < focusedWindow.Width-2 && termY < focusedWindow.Height-2 {
-					// Create adjusted mouse event with terminal-relative coordinates
-					adjustedMouse := uv.MouseWheelEvent{
-						X:      termX,
-						Y:      termY,
-						Button: uv.MouseButton(mouse.Button),
-						Mod:    uv.KeyMod(mouse.Mod),
-					}
-					// Send to the terminal (uses PTY for daemon windows)
-					sendMouseWheelToWindow(focusedWindow, adjustedMouse)
-					return o, nil
+		if focusedWindow != nil && focusedWindow.Terminal != nil && focusedWindow.Terminal.HasMouseMode() {
+			mouse := msg.Mouse()
+			// Convert to terminal-relative coordinates (0-based)
+			termX := mouse.X - focusedWindow.X - 1 // Account for left border
+			termY := mouse.Y - focusedWindow.Y - 1 // Account for top border
+			// Check if wheel is within terminal content area
+			if termX >= 0 && termY >= 0 && termX < focusedWindow.Width-2 && termY < focusedWindow.Height-2 {
+				adjustedMouse := uv.MouseWheelEvent{
+					X:      termX,
+					Y:      termY,
+					Button: uv.MouseButton(mouse.Button),
+					Mod:    uv.KeyMod(mouse.Mod),
 				}
+				sendMouseToWindow(focusedWindow, adjustedMouse)
+				return o, nil
 			}
 		}
 	}

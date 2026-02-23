@@ -474,6 +474,81 @@ func handlePrefixWindowSelection(msg tea.KeyPressMsg, o *app.OS) (*app.OS, tea.C
 	return o, nil
 }
 
+// handleLogViewerKey handles keyboard input when the log viewer overlay is active.
+// This is shared between terminal mode and window management mode.
+func handleLogViewerKey(msg tea.KeyPressMsg, o *app.OS) (*app.OS, tea.Cmd) {
+	key := msg.String()
+
+	// Close log viewer with q or esc
+	if key == "q" || key == "esc" {
+		o.ShowLogs = false
+		o.LogScrollOffset = 0
+		return o, nil
+	}
+
+	logsPerPage, maxScroll := logScrollBounds(o.Height, len(o.LogMessages))
+
+	// Scroll up/down
+	if key == "up" || key == "k" {
+		if o.LogScrollOffset > 0 {
+			o.LogScrollOffset--
+		}
+		return o, nil
+	}
+	if key == "down" || key == "j" {
+		if o.LogScrollOffset < maxScroll {
+			o.LogScrollOffset++
+		}
+		return o, nil
+	}
+
+	// Page up/down (scroll by half page)
+	pageSize := max(logsPerPage/2, 1)
+	if key == "pgup" || key == "ctrl+u" {
+		o.LogScrollOffset -= pageSize
+		if o.LogScrollOffset < 0 {
+			o.LogScrollOffset = 0
+		}
+		return o, nil
+	}
+	if key == "pgdown" || key == "ctrl+d" {
+		o.LogScrollOffset += pageSize
+		if o.LogScrollOffset > maxScroll {
+			o.LogScrollOffset = maxScroll
+		}
+		return o, nil
+	}
+
+	// Go to top/bottom
+	if key == "g" || key == "home" {
+		o.LogScrollOffset = 0
+		return o, nil
+	}
+	if key == "G" || key == "end" {
+		o.LogScrollOffset = maxScroll
+		return o, nil
+	}
+
+	// Ignore other keys when log viewer is active
+	return o, nil
+}
+
+// logScrollBounds computes the scrollable range for the log viewer overlay.
+// Returns logsPerPage (visible capacity) and maxScroll (maximum scroll offset).
+func logScrollBounds(screenHeight, totalLogs int) (logsPerPage, maxScroll int) {
+	maxDisplayHeight := max(screenHeight-8, 8)
+
+	// Fixed overhead: title (1) + blank after title (1) + blank before hint (1) + hint (1) = 4
+	fixedLines := 4
+	// If scrollable, add scroll indicator: blank (1) + indicator (1) = 2
+	if totalLogs > maxDisplayHeight-fixedLines {
+		fixedLines = 6
+	}
+	logsPerPage = max(maxDisplayHeight-fixedLines, 1)
+	maxScroll = max(totalLogs-logsPerPage, 0)
+	return logsPerPage, maxScroll
+}
+
 // isWorkspaceSwitchKey returns true if the key is a workspace switch shortcut
 // These are recorded separately by SwitchToWorkspace, not as raw keystrokes
 func isWorkspaceSwitchKey(key string) bool {

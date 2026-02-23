@@ -116,75 +116,7 @@ func HandleTerminalModeKey(msg tea.KeyPressMsg, o *app.OS) (*app.OS, tea.Cmd) {
 
 	// Handle log viewer (takes priority in terminal mode)
 	if o.ShowLogs {
-		key := msg.String()
-
-		// Close log viewer with q, esc, or Ctrl+B D l
-		if key == "q" || key == "esc" {
-			o.ShowLogs = false
-			o.LogScrollOffset = 0
-			return o, nil
-		}
-
-		// Calculate how many logs can fit on screen (matching render logic)
-		// Height - 8 for margins/borders, minimum 8
-		maxDisplayHeight := max(o.Height-8, 8)
-		totalLogs := len(o.LogMessages)
-
-		// Fixed overhead: title (1) + blank after title (1) + blank before hint (1) + hint (1) = 4
-		fixedLines := 4
-		// If scrollable, add scroll indicator: blank (1) + indicator (1) = 2
-		if totalLogs > maxDisplayHeight-fixedLines {
-			fixedLines = 6
-		}
-		logsPerPage := max(maxDisplayHeight-fixedLines, 1)
-
-		// Calculate max scroll position based on visible capacity
-		// Can only scroll if there are more logs than fit on screen
-		maxScroll := max(totalLogs-logsPerPage, 0)
-
-		// Scroll up/down
-		if key == "up" || key == "k" {
-			if o.LogScrollOffset > 0 {
-				o.LogScrollOffset--
-			}
-			return o, nil
-		}
-		if key == "down" || key == "j" {
-			if o.LogScrollOffset < maxScroll {
-				o.LogScrollOffset++
-			}
-			return o, nil
-		}
-
-		// Page up/down (scroll by half page)
-		pageSize := max(logsPerPage/2, 1)
-		if key == "pgup" || key == "ctrl+u" {
-			o.LogScrollOffset -= pageSize
-			if o.LogScrollOffset < 0 {
-				o.LogScrollOffset = 0
-			}
-			return o, nil
-		}
-		if key == "pgdown" || key == "ctrl+d" {
-			o.LogScrollOffset += pageSize
-			if o.LogScrollOffset > maxScroll {
-				o.LogScrollOffset = maxScroll
-			}
-			return o, nil
-		}
-
-		// Go to top/bottom
-		if key == "g" || key == "home" {
-			o.LogScrollOffset = 0
-			return o, nil
-		}
-		if key == "G" || key == "end" {
-			o.LogScrollOffset = maxScroll
-			return o, nil
-		}
-
-		// Ignore other keys when log viewer is active
-		return o, nil
+		return handleLogViewerKey(msg, o)
 	}
 
 	// Handle cache stats viewer (takes priority in terminal mode)
@@ -357,54 +289,10 @@ func handleTerminalWorkspacePrefix(msg tea.KeyPressMsg, o *app.OS) (*app.OS, tea
 	return o, nil
 }
 
-// handleTerminalMinimizePrefix handles minimize prefix commands in terminal mode
+// handleTerminalMinimizePrefix handles minimize prefix commands in terminal mode.
+// Delegates to HandleMinimizePrefixCommand which contains the shared logic.
 func handleTerminalMinimizePrefix(msg tea.KeyPressMsg, o *app.OS) (*app.OS, tea.Cmd) {
-	o.MinimizePrefixActive = false
-	o.PrefixActive = false
-
-	// Get list of minimized windows in current workspace
-	var minimizedWindows []int
-	for i, win := range o.Windows {
-		if win.Minimized && win.Workspace == o.CurrentWorkspace {
-			minimizedWindows = append(minimizedWindows, i)
-		}
-	}
-
-	switch msg.String() {
-	case "m":
-		// Minimize focused window
-		if o.FocusedWindow >= 0 && o.FocusedWindow < len(o.Windows) {
-			o.MinimizeWindow(o.FocusedWindow)
-		}
-		return o, nil
-	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
-		num := int(msg.String()[0] - '0')
-		if num > 0 && num <= len(minimizedWindows) {
-			windowIndex := minimizedWindows[num-1]
-			o.RestoreWindow(windowIndex)
-			// Retile if in tiling mode
-			if o.AutoTiling {
-				o.TileAllWindows()
-			}
-		}
-		return o, nil
-	case "shift+m", "M":
-		// Restore all minimized windows
-		for _, idx := range minimizedWindows {
-			o.RestoreWindow(idx)
-		}
-		// Retile if in tiling mode
-		if o.AutoTiling {
-			o.TileAllWindows()
-		}
-		return o, nil
-	case "esc":
-		// Cancel minimize prefix mode
-		return o, nil
-	default:
-		// Unknown minimize command, ignore
-		return o, nil
-	}
+	return HandleMinimizePrefixCommand(msg, o)
 }
 
 // handleTerminalTilingPrefix handles tiling/window prefix commands in terminal mode
@@ -475,91 +363,16 @@ func handleTerminalTilingPrefix(msg tea.KeyPressMsg, o *app.OS) (*app.OS, tea.Cm
 	}
 }
 
-// handleTerminalDebugPrefix handles debug prefix commands (Ctrl+B, D, ...)
+// handleTerminalDebugPrefix handles debug prefix commands (Ctrl+B, D, ...) in terminal mode.
+// Delegates to HandleDebugPrefixCommand which contains the shared logic.
 func handleTerminalDebugPrefix(msg tea.KeyPressMsg, o *app.OS) (*app.OS, tea.Cmd) {
-	o.DebugPrefixActive = false
-	o.PrefixActive = false
-
-	switch msg.String() {
-	case "l":
-		// Toggle log viewer
-		o.ShowLogs = !o.ShowLogs
-		if o.ShowLogs {
-			o.ShowNotification("Log Viewer: ON", "info", config.NotificationDuration)
-		} else {
-			o.ShowNotification("Log Viewer: OFF", "info", config.NotificationDuration)
-		}
-		return o, nil
-	case "c":
-		// Toggle cache statistics
-		o.ShowCacheStats = !o.ShowCacheStats
-		if o.ShowCacheStats {
-			o.ShowNotification("Cache Stats: ON", "info", config.NotificationDuration)
-		} else {
-			o.ShowNotification("Cache Stats: OFF", "info", config.NotificationDuration)
-		}
-		return o, nil
-	case "k":
-		// Toggle showkeys overlay
-		o.ShowKeys = !o.ShowKeys
-		if o.ShowKeys {
-			o.ShowNotification("Showkeys: ON", "info", config.NotificationDuration)
-		} else {
-			o.ShowNotification("Showkeys: OFF", "info", config.NotificationDuration)
-		}
-		return o, nil
-	case "a":
-		// Toggle animations
-		config.AnimationsEnabled = !config.AnimationsEnabled
-		if config.AnimationsEnabled {
-			o.ShowNotification("Animations: ON", "info", config.NotificationDuration)
-		} else {
-			o.ShowNotification("Animations: OFF", "info", config.NotificationDuration)
-		}
-		return o, nil
-	case "esc":
-		// Cancel debug prefix mode
-		return o, nil
-	default:
-		// Unknown debug command, ignore
-		return o, nil
-	}
+	return HandleDebugPrefixCommand(msg, o)
 }
 
-// handleTerminalTapePrefix handles tape prefix commands (Ctrl+B, T, ...)
+// handleTerminalTapePrefix handles tape prefix commands (Ctrl+B, T, ...) in terminal mode.
+// Delegates to HandleTapePrefixCommand which contains the shared logic.
 func handleTerminalTapePrefix(msg tea.KeyPressMsg, o *app.OS) (*app.OS, tea.Cmd) {
-	o.TapePrefixActive = false
-	o.PrefixActive = false
-
-	switch msg.String() {
-	case "m":
-		// Open tape manager
-		o.ToggleTapeManager()
-		return o, nil
-	case "r":
-		// Start recording - show naming prompt
-		if o.TapeRecorder != nil && o.TapeRecorder.IsRecording() {
-			o.ShowNotification("Already recording", "warning", config.NotificationDuration)
-		} else {
-			o.TapeManagerStartRecording()
-			o.ShowTapeManager = true // Show the UI for naming
-		}
-		return o, nil
-	case "s":
-		// Stop recording
-		if o.TapeRecorder != nil && o.TapeRecorder.IsRecording() {
-			o.TapeManagerStopRecording()
-		} else {
-			o.ShowNotification("Not recording", "warning", config.NotificationDuration)
-		}
-		return o, nil
-	case "esc":
-		// Cancel tape prefix mode
-		return o, nil
-	default:
-		// Unknown tape command, ignore
-		return o, nil
-	}
+	return HandleTapePrefixCommand(msg, o)
 }
 
 // handleTerminalPrefixCommand handles prefix commands in terminal mode
@@ -888,73 +701,7 @@ func HandleWindowManagementModeKey(msg tea.KeyPressMsg, o *app.OS) (*app.OS, tea
 
 	// Handle log viewer (takes priority in window management mode)
 	if o.ShowLogs {
-		// Close log viewer with q, esc, or Ctrl+B D l
-		if key == "q" || key == "esc" {
-			o.ShowLogs = false
-			o.LogScrollOffset = 0
-			return o, nil
-		}
-
-		// Calculate how many logs can fit on screen (matching render logic)
-		// Height - 8 for margins/borders, minimum 8
-		maxDisplayHeight := max(o.Height-8, 8)
-		totalLogs := len(o.LogMessages)
-
-		// Fixed overhead: title (1) + blank after title (1) + blank before hint (1) + hint (1) = 4
-		fixedLines := 4
-		// If scrollable, add scroll indicator: blank (1) + indicator (1) = 2
-		if totalLogs > maxDisplayHeight-fixedLines {
-			fixedLines = 6
-		}
-		logsPerPage := max(maxDisplayHeight-fixedLines, 1)
-
-		// Calculate max scroll position based on visible capacity
-		// Can only scroll if there are more logs than fit on screen
-		maxScroll := max(totalLogs-logsPerPage, 0)
-
-		// Scroll up/down
-		if key == "up" || key == "k" {
-			if o.LogScrollOffset > 0 {
-				o.LogScrollOffset--
-			}
-			return o, nil
-		}
-		if key == "down" || key == "j" {
-			if o.LogScrollOffset < maxScroll {
-				o.LogScrollOffset++
-			}
-			return o, nil
-		}
-
-		// Page up/down (scroll by half page)
-		pageSize := max(logsPerPage/2, 1)
-		if key == "pgup" || key == "ctrl+u" {
-			o.LogScrollOffset -= pageSize
-			if o.LogScrollOffset < 0 {
-				o.LogScrollOffset = 0
-			}
-			return o, nil
-		}
-		if key == "pgdown" || key == "ctrl+d" {
-			o.LogScrollOffset += pageSize
-			if o.LogScrollOffset > maxScroll {
-				o.LogScrollOffset = maxScroll
-			}
-			return o, nil
-		}
-
-		// Go to top/bottom
-		if key == "g" || key == "home" {
-			o.LogScrollOffset = 0
-			return o, nil
-		}
-		if key == "G" || key == "end" {
-			o.LogScrollOffset = maxScroll
-			return o, nil
-		}
-
-		// Ignore other keys when log viewer is active
-		return o, nil
+		return handleLogViewerKey(msg, o)
 	}
 
 	// Handle cache stats viewer (takes priority in window management mode)
