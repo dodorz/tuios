@@ -47,7 +47,7 @@ func TestMouseForwardingRequiresMouseMode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			em := vt.NewEmulator(80, 24)
-			defer em.Close()
+			defer func() { _ = em.Close() }()
 			win := &terminal.Window{
 				Terminal: em,
 			}
