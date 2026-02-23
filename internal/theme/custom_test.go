@@ -3,6 +3,7 @@ package theme
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	tint "github.com/lrstanley/bubbletint/v2"
@@ -227,14 +228,7 @@ func TestLoadCustomThemes_Registration(t *testing.T) {
 
 	// Check that the theme appears in the registry
 	ids := tint.TintIDs()
-	found := false
-	for _, id := range ids {
-		if id == "test-registration-unique" {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !slices.Contains(ids, "test-registration-unique") {
 		t.Error("custom theme 'test-registration-unique' not found in TintIDs()")
 	}
 }

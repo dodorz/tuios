@@ -49,10 +49,7 @@ func TestMouseForwardingRequiresMouseMode(t *testing.T) {
 			em := vt.NewEmulator(80, 24)
 			defer em.Close()
 			win := &terminal.Window{
-				Width:       82,
-				Height:      26,
-				Terminal:    em,
-				IsAltScreen: tt.isAltScreen,
+				Terminal: em,
 			}
 
 			if tt.hasMouseMode {
