@@ -9,7 +9,7 @@ type Screen struct {
 	// cb is the callbacks struct to use.
 	cb *Callbacks
 	// The buffer of the screen.
-	buf uv.Buffer
+	buf *uv.RenderBuffer
 	// The cur of the screen.
 	cur, saved Cursor
 	// scroll is the scroll region.
@@ -22,7 +22,8 @@ type Screen struct {
 func NewScreen(w, h int) *Screen {
 	s := Screen{}
 	s.scrollback = NewScrollback(0) // Use default size
-	s.Resize(w, h)
+	s.buf = uv.NewRenderBuffer(w, h)
+	s.scroll = s.buf.Bounds()
 	return &s
 }
 
@@ -64,6 +65,10 @@ func (s *Screen) Height() int {
 // Resize resizes the screen.
 func (s *Screen) Resize(width int, height int) {
 	s.buf.Resize(width, height)
+	// Resize the Touched slice to match the new height.
+	if h := s.buf.Height(); len(s.buf.Touched) != h {
+		s.buf.Touched = make([]*uv.LineData, h)
+	}
 	s.scroll = s.buf.Bounds()
 }
 
@@ -271,7 +276,7 @@ func (s *Screen) ScrollUp(n int) {
 		// Save the top n lines to scrollback before they're deleted
 		for i := 0; i < n && i < scroll.Dy(); i++ {
 			y := scroll.Min.Y + i
-			line := extractLine(&s.buf, y, width)
+			line := extractLine(s.buf.Buffer, y, width)
 			s.scrollback.PushLine(line)
 		}
 	}

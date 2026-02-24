@@ -12,7 +12,7 @@ import (
 )
 
 func (m *OS) GetCanvas(render bool) *lipgloss.Canvas {
-	canvas := lipgloss.NewCanvas()
+	canvas := lipgloss.NewCanvas(m.GetRenderWidth(), m.GetRenderHeight())
 
 	layersPtr := pool.GetLayerSlice()
 	layers := (*layersPtr)[:0]
@@ -139,7 +139,9 @@ func (m *OS) GetCanvas(render bool) *lipgloss.Canvas {
 		}
 	}
 
-	canvas.AddLayers(layers...)
+	for _, layer := range layers {
+		canvas.Compose(layer)
+	}
 	return canvas
 }
 
