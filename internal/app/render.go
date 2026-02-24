@@ -139,9 +139,7 @@ func (m *OS) GetCanvas(render bool) *lipgloss.Canvas {
 		}
 	}
 
-	for _, layer := range layers {
-		canvas.Compose(layer)
-	}
+	canvas.Compose(lipgloss.NewCompositor(layers...))
 	return canvas
 }
 
