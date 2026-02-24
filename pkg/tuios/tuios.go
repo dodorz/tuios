@@ -336,6 +336,11 @@ func FilterMouseMotion(model tea.Model, msg tea.Msg) tea.Msg {
 		return msg
 	}
 
+	// Allow motion events for scrollback browser drag-to-select
+	if os.ShowScrollbackBrowser {
+		return msg
+	}
+
 	// Allow motion events during text selection
 	if os.SelectionMode {
 		focusedWindow := os.GetFocusedWindow()

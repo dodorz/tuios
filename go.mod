@@ -1,6 +1,6 @@
 module github.com/Gaurav-Gosain/tuios
 
-go 1.24.4
+go 1.25.0
 
 require (
 	charm.land/bubbletea/v2 v2.0.0-rc.2
@@ -15,13 +15,17 @@ require (
 	github.com/charmbracelet/x/xpty v0.1.3
 	github.com/google/uuid v1.6.0
 	github.com/lrstanley/bubbletint/v2 v2.0.0-alpha.9
-	github.com/mattn/go-runewidth v0.0.19
+	github.com/lrstanley/go-nf v0.0.0-20260224052632-5067bad45c5b
 	github.com/pelletier/go-toml/v2 v2.2.4
-	github.com/rivo/uniseg v0.4.7
 	github.com/shirou/gopsutil/v4 v4.25.10
 	github.com/spf13/cobra v1.10.1
 	golang.org/x/sys v0.38.0
 	golang.org/x/term v0.36.0
+)
+
+require (
+	github.com/mattn/go-runewidth v0.0.19 // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
 )
 
 require (
@@ -31,7 +35,7 @@ require (
 	github.com/charmbracelet/keygen v0.5.4 // indirect
 	github.com/charmbracelet/lipgloss v1.1.0 // indirect
 	github.com/charmbracelet/log v0.4.2 // indirect
-	github.com/charmbracelet/x/ansi v0.11.2
+	github.com/charmbracelet/x/ansi v0.11.6
 	github.com/charmbracelet/x/cellbuf v0.0.14 // indirect
 	github.com/charmbracelet/x/conpty v0.1.1 // indirect
 	github.com/charmbracelet/x/errors v0.0.0-20251110184232-6ab307057ac7 // indirect
@@ -39,9 +43,9 @@ require (
 	github.com/charmbracelet/x/term v0.2.2 // indirect
 	github.com/charmbracelet/x/termios v0.1.1 // indirect
 	github.com/charmbracelet/x/windows v0.2.2 // indirect
-	github.com/clipperhouse/displaywidth v0.6.0 // indirect
+	github.com/clipperhouse/displaywidth v0.9.0 // indirect
 	github.com/clipperhouse/stringish v0.1.1 // indirect
-	github.com/clipperhouse/uax29/v2 v2.3.0 // indirect
+	github.com/clipperhouse/uax29/v2 v2.5.0 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
 	github.com/creack/pty v1.1.24 // indirect
 	github.com/ebitengine/purego v0.9.0 // indirect

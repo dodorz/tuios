@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/lrstanley/go-nf/glyphs/fa"
+	"github.com/lrstanley/go-nf/glyphs/ple"
 )
 
 // =============================================================================
@@ -152,35 +154,51 @@ const (
 
 // =============================================================================
 // Dock Visual Characters - Nerd Font Icons (Default)
+// Initialized from go-nf library in init()
 // =============================================================================
 
-const (
+var (
 	// DockPillLeftChar is the left character for pill-style indicators
-	// Set to "" to disable, or use custom characters
-	DockPillLeftChar = string(rune(0xe0b6)) // Powerline left semicircle
+	DockPillLeftChar string
 
 	// DockPillRightChar is the right character for pill-style indicators
-	// Set to "" to disable, or use custom characters
-	DockPillRightChar = string(rune(0xe0b4)) // Powerline right semicircle
+	DockPillRightChar string
 
 	// DockModeIconWindow is the icon for window mode (Nerd Font: nf-fa-window_restore)
-	DockModeIconWindow = " " + string(rune(0xf2d2)) + " " //
+	DockModeIconWindow string
 
 	// DockModeIconTerminal is the icon for terminal mode (Nerd Font: nf-fa-terminal)
-	DockModeIconTerminal = " " + string(rune(0xf120)) + " " //
+	DockModeIconTerminal string
 
 	// DockModeIconTiling is the icon for tiling mode (Nerd Font: nf-fa-th - 3x3 grid)
-	DockModeIconTiling = " " + string(rune(0xf00a)) + " " //
+	DockModeIconTiling string
 
 	// DockIconTerminalCount is the icon for terminal count (Nerd Font: nf-fa-terminal)
-	DockIconTerminalCount = string(rune(0xf120)) //
+	DockIconTerminalCount string
 
 	// DockIconWorkspaceCount is the icon for workspace count (Nerd Font: nf-fa-th_large - 2x2 grid)
-	DockIconWorkspaceCount = string(rune(0xf009)) //
+	DockIconWorkspaceCount string
 
 	// DockSeparator is the separator between dock sections
 	DockSeparator = "  " // Two spaces for breathing room
+
+	// WindowPillLeft is the left pill-style character for window decorations.
+	WindowPillLeft string
+	// WindowPillRight is the right pill-style character for window decorations.
+	WindowPillRight string
 )
+
+func init() {
+	DockPillLeftChar = ple.LeftHalfCircleThick.String()
+	DockPillRightChar = ple.RightHalfCircleThick.String()
+	DockModeIconWindow = " " + fa.WindowRestore.String() + " "
+	DockModeIconTerminal = " " + fa.Terminal.String() + " "
+	DockModeIconTiling = " " + fa.Th.String() + " "
+	DockIconTerminalCount = fa.Terminal.String()
+	DockIconWorkspaceCount = fa.ThLarge.String()
+	WindowPillLeft = ple.LeftHalfCircleThick.String()
+	WindowPillRight = ple.RightHalfCircleThick.String()
+}
 
 // =============================================================================
 // Dock Visual Characters - ASCII Fallback
@@ -418,10 +436,6 @@ const (
 
 	// WindowButtonClose is the close/kill window button character.
 	WindowButtonClose = " ⤫ " // Close/kill window
-	// WindowPillLeft is the left pill-style character for window decorations.
-	WindowPillLeft = string(rune(0xe0b6))
-	// WindowPillRight is the right pill-style character for window decorations.
-	WindowPillRight = string(rune(0xe0b4))
 	// WindowSeparatorChar is the separator character for window elements.
 	WindowSeparatorChar = "─" // U+2500
 )
@@ -661,6 +675,9 @@ const (
 
 	// ZIndexWhichKey is the z-index for which-key overlay
 	ZIndexWhichKey = 1002
+
+	// ZIndexScrollbackBrowser is the z-index for the scrollback browser overlay
+	ZIndexScrollbackBrowser = 1003
 
 	// ZIndexNotifications is the z-index for notifications
 	ZIndexNotifications = 2000

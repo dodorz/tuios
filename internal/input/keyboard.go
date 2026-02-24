@@ -145,6 +145,11 @@ func HandleTerminalModeKey(msg tea.KeyPressMsg, o *app.OS) (*app.OS, tea.Cmd) {
 		return HandleCopyModeKey(msg, o, focusedWindow)
 	}
 
+	// Handle scrollback browser overlay
+	if o.ShowScrollbackBrowser {
+		return HandleScrollbackBrowserKey(msg, o)
+	}
+
 	// Check for prefix key in terminal mode
 	msgStr := strings.ToLower(msg.String())
 	leaderKey := strings.ToLower(config.LeaderKey)
@@ -537,6 +542,10 @@ func handleTerminalPrefixCommand(msg tea.KeyPressMsg, o *app.OS) (*app.OS, tea.C
 			o.ShowNotification("COPY MODE (hjkl/q)", "info", config.NotificationDuration*2)
 		}
 		return o, nil
+	case "s":
+		// Open scrollback browser
+		OpenScrollbackBrowser(o)
+		return o, nil
 
 	// Help
 	case "?":
@@ -619,6 +628,11 @@ func HandleWindowManagementModeKey(msg tea.KeyPressMsg, o *app.OS) (*app.OS, tea
 	// Handle copy mode (vim-style scrollback/selection) - takes priority
 	if focusedWindow != nil && focusedWindow.CopyMode != nil && focusedWindow.CopyMode.Active {
 		return HandleCopyModeKey(msg, o, focusedWindow)
+	}
+
+	// Handle scrollback browser overlay
+	if o.ShowScrollbackBrowser {
+		return HandleScrollbackBrowserKey(msg, o)
 	}
 
 	key := msg.String()

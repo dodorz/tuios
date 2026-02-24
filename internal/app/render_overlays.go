@@ -106,6 +106,15 @@ func (m *OS) renderOverlays() []*lipgloss.Layer {
 		layers = append(layers, welcomeLayer)
 	}
 
+	if m.ShowScrollbackBrowser {
+		browserContent := m.renderScrollbackBrowser()
+		if browserContent != "" {
+			browserLayer := lipgloss.NewLayer(browserContent).
+				X(0).Y(0).Z(config.ZIndexScrollbackBrowser).ID("scrollback-browser")
+			layers = append(layers, browserLayer)
+		}
+	}
+
 	if m.ShowQuitConfirm {
 		quitContent, width, height := m.renderQuitConfirmDialog()
 		x := (m.GetRenderWidth() - width) / 2

@@ -14,6 +14,10 @@ func (m *OS) getRealCursor() *tea.Cursor {
 		return nil
 	}
 
+	if m.ShowScrollbackBrowser {
+		return nil
+	}
+
 	window := m.Windows[m.FocusedWindow]
 	if window == nil || window.Terminal == nil {
 		return nil

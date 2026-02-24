@@ -211,6 +211,9 @@ type OS struct {
 	// Used to suppress misparsed mouse-sequence fragments (phantom keypresses)
 	// during the AllMotion→CellMotion transition window.
 	TerminalModeEnteredAt time.Time
+	// Scrollback browser overlay
+	ShowScrollbackBrowser bool
+	ScrollbackBrowser     any // *scrollback.Browser — typed as any to avoid import cycle
 }
 
 // Notification represents a temporary notification message.

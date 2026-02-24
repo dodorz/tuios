@@ -124,6 +124,60 @@ func (e *Emulator) handleWorkingDirectory(cmd int, data []byte) {
 	}
 }
 
+func (e *Emulator) handleSemanticZone(data []byte) {
+	// OSC 133 format: "133;<subcommand>[;params]"
+	// data includes the "133;" prefix from the parser
+	parts := bytes.Split(data, []byte{';'})
+	if len(parts) < 2 || len(parts[1]) == 0 {
+		return
+	}
+
+	subCmd := parts[1][0] // 'A', 'B', 'C', or 'D'
+	switch subCmd {
+	case 'A', 'B', 'C', 'D':
+		// valid
+	default:
+		return
+	}
+
+	curX, curY := e.scr.CursorPosition()
+	absLine := e.ScrollbackLen() + curY
+
+	exitCode := -1
+	if subCmd == 'D' && len(parts) >= 3 {
+		// Parse exit code from params (e.g., "D;0" or "D;1")
+		code := 0
+		for _, b := range parts[2] {
+			if b >= '0' && b <= '9' {
+				code = code*10 + int(b-'0')
+			}
+		}
+		if len(parts[2]) > 0 {
+			exitCode = code
+		}
+	}
+
+	if e.semanticMarkers != nil {
+		marker := SemanticMarker{
+			Type:     SemanticMarkerType(subCmd),
+			AbsLine:  absLine,
+			Col:      curX,
+			ExitCode: exitCode,
+		}
+
+		// On C marker (command executed), capture the command text from the
+		// terminal buffer before the program's output overwrites it.
+		// This is the only reliable time to read the command text.
+		if subCmd == 'C' {
+			if bMarker := e.semanticMarkers.Last(MarkerCommandStart); bMarker != nil {
+				marker.CapturedText = e.extractCommandText(bMarker.AbsLine, bMarker.Col, absLine, curX)
+			}
+		}
+
+		e.semanticMarkers.Add(marker)
+	}
+}
+
 func (e *Emulator) handleHyperlink(cmd int, data []byte) {
 	parts := bytes.Split(data, []byte{';'})
 	if len(parts) != 3 || cmd != 8 {

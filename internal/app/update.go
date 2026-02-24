@@ -356,8 +356,10 @@ func (m *OS) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		// Skip rendering if no changes, no animations, and not in interaction mode (frame skipping)
-		if !hasChanges && !hasAnimations && !m.InteractionMode && len(m.Windows) > 0 {
+		// Skip rendering if no changes, no animations, and not in interaction mode (frame skipping).
+		// Don't skip when PrefixActive — the whichkey overlay needs re-render
+		// after a time-based delay (500ms) to appear.
+		if !hasChanges && !hasAnimations && !m.InteractionMode && !m.PrefixActive && len(m.Windows) > 0 {
 			m.renderSkipped = true
 			if len(cmds) > 1 {
 				return m, tea.Sequence(cmds...)

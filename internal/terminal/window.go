@@ -773,9 +773,7 @@ func (w *Window) handleIOOperations() {
 	w.cancelFunc = cancel
 
 	// PTY to Terminal copy (output from shell) - with proper context handling
-	w.ioWg.Add(1)
-	go func() {
-		defer w.ioWg.Done()
+	w.ioWg.Go(func() {
 		defer func() {
 			if r := recover(); r != nil {
 				// Silently recover from panics during PTY read
@@ -835,12 +833,10 @@ func (w *Window) handleIOOperations() {
 				}
 			}
 		}
-	}()
+	})
 
 	// Terminal to PTY copy (input to shell) - with proper context handling
-	w.ioWg.Add(1)
-	go func() {
-		defer w.ioWg.Done()
+	w.ioWg.Go(func() {
 		defer func() {
 			if r := recover(); r != nil {
 				// Silently recover from panics during terminal read
@@ -934,7 +930,7 @@ func (w *Window) handleIOOperations() {
 				}
 			}
 		}
-	}()
+	})
 }
 
 // Resize resizes the window and its terminal.

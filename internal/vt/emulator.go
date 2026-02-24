@@ -3,6 +3,7 @@ package vt
 import (
 	"image/color"
 	"io"
+	"strings"
 	"sync/atomic"
 
 	uv "github.com/charmbracelet/ultraviolet"
@@ -92,6 +93,9 @@ type Emulator struct {
 
 	// Sixel graphics passthrough callback
 	sixelPassthroughFunc func(cmd *SixelCommand, cursorX, cursorY, absLine int)
+
+	// semanticMarkers tracks OSC 133 shell integration markers
+	semanticMarkers *SemanticMarkerList
 }
 
 // NewEmulator creates a new virtual terminal emulator.
@@ -141,6 +145,15 @@ func NewEmulator(w, h int) *Emulator {
 	t.sixelMain = NewSixelState()
 	t.sixelAlt = NewSixelState()
 	t.registerSixelGraphicsHandler()
+
+	t.semanticMarkers = NewSemanticMarkerList(10000)
+
+	// Wire scrollback trim to semantic markers adjustment
+	if sb := t.scrs[0].Scrollback(); sb != nil {
+		sb.SetOnTrim(func(n int) {
+			t.semanticMarkers.AdjustForScrollbackTrim(n)
+		})
+	}
 
 	return t
 }
@@ -206,6 +219,73 @@ func (e *Emulator) ClearScrollback() {
 // ScrollbackLen returns the number of lines in the scrollback buffer.
 func (e *Emulator) ScrollbackLen() int {
 	return e.scrs[0].ScrollbackLen()
+}
+
+// SemanticMarkers returns the list of OSC 133 semantic zone markers.
+func (e *Emulator) SemanticMarkers() *SemanticMarkerList {
+	return e.semanticMarkers
+}
+
+// extractCommandText extracts the command text between a B marker position
+// and a C marker position. Called at C-marker time before output overwrites the buffer.
+func (e *Emulator) extractCommandText(bLine, bCol, cLine, _ int) string {
+	sbLen := e.ScrollbackLen()
+	width := e.Width()
+	height := e.Height()
+
+	readLine := func(absLine int) string {
+		if absLine < sbLen {
+			line := e.ScrollbackLine(absLine)
+			if line == nil {
+				return ""
+			}
+			var sb strings.Builder
+			for _, cell := range line {
+				if cell.Content != "" {
+					sb.WriteString(string(cell.Content))
+				} else {
+					sb.WriteByte(' ')
+				}
+			}
+			return strings.TrimRight(sb.String(), " ")
+		}
+		screenY := absLine - sbLen
+		if screenY < 0 || screenY >= height {
+			return ""
+		}
+		var sb strings.Builder
+		for x := range width {
+			cell := e.CellAt(x, screenY)
+			if cell != nil && cell.Content != "" {
+				sb.WriteString(string(cell.Content))
+			} else {
+				sb.WriteByte(' ')
+			}
+		}
+		return strings.TrimRight(sb.String(), " ")
+	}
+
+	// Single-line command (most common case)
+	if bLine == cLine || cLine == bLine+1 {
+		full := readLine(bLine)
+		runes := []rune(full)
+		if bCol >= len(runes) {
+			return ""
+		}
+		return strings.TrimSpace(string(runes[bCol:]))
+	}
+
+	// Multi-line command
+	var parts []string
+	firstLine := readLine(bLine)
+	runes := []rune(firstLine)
+	if bCol < len(runes) {
+		parts = append(parts, strings.TrimSpace(string(runes[bCol:])))
+	}
+	for line := bLine + 1; line < cLine; line++ {
+		parts = append(parts, readLine(line))
+	}
+	return strings.Join(parts, "\n")
 }
 
 // ScrollbackLine returns a line from the scrollback buffer at the given index.

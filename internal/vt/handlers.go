@@ -328,6 +328,12 @@ func (e *Emulator) registerDefaultOscHandlers() {
 			return true
 		})
 	}
+
+	// OSC 133 - Semantic prompt / shell integration (FinalTerm)
+	e.RegisterOscHandler(133, func(data []byte) bool {
+		e.handleSemanticZone(data)
+		return true
+	})
 }
 
 // registerDefaultEscHandlers registers the default ESC escape sequence handlers.
@@ -551,6 +557,9 @@ func (e *Emulator) registerDefaultCsiHandlers() {
 			e.scr.ClearScrollback()
 			e.scr.Clear()
 			e.KittyState().Clear()
+			if e.semanticMarkers != nil {
+				e.semanticMarkers.Clear()
+			}
 		default:
 			return false
 		}

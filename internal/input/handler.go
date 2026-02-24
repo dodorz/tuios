@@ -28,14 +28,31 @@ func HandleInput(msg tea.Msg, o *app.OS) (tea.Model, tea.Cmd) {
 	case tea.PasteEndMsg:
 		return o, nil
 	case tea.MouseClickMsg:
-		result, cmd = handleMouseClick(msg, o)
+		if o.ShowScrollbackBrowser {
+			result, cmd = handleScrollbackBrowserMouseClick(msg, o)
+		} else {
+			result, cmd = handleMouseClick(msg, o)
+		}
 	case tea.MouseMotionMsg:
+		if o.ShowScrollbackBrowser {
+			result, cmd = handleScrollbackBrowserMouseMotion(msg, o)
+			// Don't sync motion events
+			return result, cmd
+		}
 		// Don't sync on motion - too frequent
 		return handleMouseMotion(msg, o)
 	case tea.MouseReleaseMsg:
-		result, cmd = handleMouseRelease(msg, o)
+		if o.ShowScrollbackBrowser {
+			result, cmd = handleScrollbackBrowserMouseRelease(o)
+		} else {
+			result, cmd = handleMouseRelease(msg, o)
+		}
 	case tea.MouseWheelMsg:
-		result, cmd = handleMouseWheel(msg, o)
+		if o.ShowScrollbackBrowser {
+			result, cmd = handleScrollbackBrowserMouseWheel(msg, o)
+		} else {
+			result, cmd = handleMouseWheel(msg, o)
+		}
 	case tea.PasteMsg:
 		// Handle bracketed paste from terminal (when pasting via Cmd+V in Ghostty, etc.)
 		// Only handle paste in terminal mode

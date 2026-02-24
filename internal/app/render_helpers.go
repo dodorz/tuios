@@ -12,12 +12,6 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// Deprecated: Use config.GetWindowPillLeft() instead
-const (
-	LeftHalfCircle  string = string(rune(0xe0b6))
-	RightHalfCircle string = string(rune(0xe0b4))
-)
-
 var (
 	baseButtonStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#000000"))
 )

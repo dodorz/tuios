@@ -29,6 +29,9 @@ type Scrollback struct {
 	// softWrapped indicates which lines are soft-wrapped (not hard breaks)
 	// A soft-wrapped line can be reflowed to a different width
 	softWrapped []bool
+	// onTrim is called when oldest lines are overwritten by the ring buffer.
+	// The argument is the number of lines trimmed (always 1 per overwrite).
+	onTrim func(int)
 }
 
 // NewScrollback creates a new scrollback buffer with the specified maximum
@@ -57,6 +60,11 @@ func (sb *Scrollback) PushLine(line uv.Line) {
 	sb.PushLineWithWrap(line, true) // Default to soft-wrapped for backwards compatibility
 }
 
+// SetOnTrim sets a callback that fires when the ring buffer overwrites oldest lines.
+func (sb *Scrollback) SetOnTrim(fn func(int)) {
+	sb.onTrim = fn
+}
+
 // PushLineWithWrap adds a line with wrap information for soft-wrap support.
 func (sb *Scrollback) PushLineWithWrap(line uv.Line, isSoftWrapped bool) {
 	if len(line) == 0 {
@@ -77,6 +85,9 @@ func (sb *Scrollback) PushLineWithWrap(line uv.Line, isSoftWrapped bool) {
 	// If buffer is full, advance head (oldest line pointer) as well
 	if sb.full {
 		sb.head = (sb.head + 1) % sb.maxLines
+		if sb.onTrim != nil {
+			sb.onTrim(1)
+		}
 	}
 
 	// Mark as full when tail catches up to head
@@ -134,13 +145,18 @@ func (sb *Scrollback) Lines() []uv.Line {
 
 // Clear removes all lines from the scrollback buffer.
 func (sb *Scrollback) Clear() {
+	count := sb.Len()
 	sb.head = 0
 	sb.tail = 0
 	sb.full = false
-	// Optionally nil out the lines to help GC, but keep the slice
+	// Nil out the lines to help GC, but keep the slice
 	for i := range sb.lines {
 		sb.lines[i] = nil
 		sb.softWrapped[i] = false
+	}
+	// Notify marker list so stale markers are removed
+	if sb.onTrim != nil && count > 0 {
+		sb.onTrim(count)
 	}
 }
 

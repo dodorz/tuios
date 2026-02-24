@@ -159,6 +159,7 @@ func DefaultConfig() *UserConfig {
 				"prefix_split_vertical":   {"|", "\\"},
 				"prefix_rotate_split":     {"R"},
 				"prefix_equalize_splits":  {"="},
+			"prefix_scrollback":       {"s"},
 			},
 			WindowPrefix: map[string][]string{
 				"window_prefix_new":    {"n"},
